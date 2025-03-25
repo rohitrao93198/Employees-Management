@@ -7,7 +7,11 @@ const STORAGE_KEYS = {
 export const storage = {
     getUsers: () => {
         const users = localStorage.getItem(STORAGE_KEYS.USERS);
-        return users ? JSON.parse(users) : [];
+        if (users) {
+            return JSON.parse(users);
+        } else {
+            return [];
+        }
     },
 
     setUsers: (users) => {
@@ -16,7 +20,11 @@ export const storage = {
 
     getTeams: () => {
         const teams = localStorage.getItem(STORAGE_KEYS.TEAMS);
-        return teams ? JSON.parse(teams) : [];
+        if (teams) {
+            return JSON.parse(teams);
+        } else {
+            return [];
+        }
     },
 
     setTeams: (teams) => {
@@ -25,7 +33,11 @@ export const storage = {
 
     getCurrentUser: () => {
         const user = localStorage.getItem(STORAGE_KEYS.CURRENT_USER);
-        return user ? JSON.parse(user) : null;
+        if (user) {
+            return JSON.parse(user);
+        } else {
+            return null;
+        }
     },
 
     setCurrentUser: (user) => {
@@ -46,8 +58,8 @@ export const storage = {
 
 // Initialize default data
 const initializeDefaultData = () => {
-    const currentDateTime = new Date().toISOString();
-    const currentUser = 'rohitrao93198';
+    const currentDateTime = new Date().toISOString().split('T')[0];
+    // const currentUser = 'rohitrao93198';
 
     // Only initialize if no users exist
     if (storage.getUsers().length === 0) {
@@ -68,13 +80,13 @@ const initializeDefaultData = () => {
                 name: 'Default Admin',
                 role: 'ADMIN',
                 createdAt: currentDateTime,
-                createdBy: currentUser
+                createdBy: 'system'
             },
             {
                 id: 3,
-                email: `${currentUser}@company.com`,
+                email: `emp@gmail.com`,
                 password: 'employee123',
-                name: currentUser,
+                name: 'Default Employee',
                 role: 'EMPLOYEE',
                 createdAt: currentDateTime,
                 createdBy: 'system'

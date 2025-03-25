@@ -16,18 +16,14 @@ import {
     Tab,
     Box
 } from '@mui/material';
-import EditIcon from '@mui/icons-material/Edit';
 import UserList from '../users/UserList';
 import UserProfileView from '../users/UserProfileView';
 import TeamList from '../teams/TeamList';
 import { storage } from '../../utils/localStorage';
 import { useAuth } from '../../context/AuthContext';
 
-const CURRENT_TIME = new Date().toISOString();
-const CREATOR_NAME = storage.getCurrentUser()?.name || 'Employee';
-
 const EmployeeDashboard = () => {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, updateCurrentUser } = useAuth();
     const [users, setUsers] = useState({ admins: [], employees: [] });
     const [selectedUser, setSelectedUser] = useState(null);
     const [openProfileDialog, setOpenProfileDialog] = useState(false);
@@ -42,51 +38,104 @@ const EmployeeDashboard = () => {
         const allUsers = storage.getUsers();
         const allTeams = storage.getTeams();
 
-        const admins = allUsers.filter(user =>
-            user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-        ).map(user => ({
-            ...user,
-            designation: user.role === 'SUPER_ADMIN' ? 'Super Admin' : 'Admin'
-        }));
+        const admins = allUsers.filter(user => {
+            if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                return true;
+            }
+            return false;
+        }).map(user => {
+            const updatedUser = { ...user };
+            if (user.role === 'SUPER_ADMIN') {
+                updatedUser.designation = 'Super Admin';
+            } else {
+                updatedUser.designation = 'Admin';
+            }
+            return updatedUser;
+        });
 
-        const employees = allUsers.filter(user => user.role === 'EMPLOYEE');
+        const employees = allUsers.filter(user => {
+            if (user.role === 'EMPLOYEE') {
+                return true;
+            }
+            return false;
+        }).map(user => {
+            const updatedUser = { ...user };
+            if (user.designation) {
+                updatedUser.designation = user.designation;
+            } else {
+                updatedUser.designation = 'Employee';
+            }
+            return updatedUser;
+        });
 
         setUsers({ admins, employees });
-        setTeams(allTeams);
-    };
 
-    const handleViewProfile = (user) => {
-        setSelectedUser(user);
-        setOpenProfileDialog(true);
+        const updatedTeams = allTeams.map(team => {
+            return {
+                ...team,
+                members: team.members.map(member => {
+                    const user = allUsers.find(u => u.id === member.userId);
+                    const updatedMember = { ...member };
+
+                    if (user) {
+                        if (user.role === 'SUPER_ADMIN') {
+                            updatedMember.designation = 'Super Admin';
+                        } else if (user.role === 'ADMIN') {
+                            updatedMember.designation = 'Admin';
+                        } else if (user.designation) {
+                            updatedMember.designation = user.designation;
+                        } else {
+                            updatedMember.designation = 'Employee';
+                        }
+                    } else {
+                        updatedMember.designation = 'Not Assigned';
+                    }
+
+                    return updatedMember;
+                })
+            };
+        });
+
+        setTeams(updatedTeams);
     };
 
     const handleUpdateUser = (userId, updatedData) => {
-        if (userId !== currentUser.id || !updatedData) return;
+        if (!userId || !updatedData) {
+            return;
+        }
+
+        if (userId !== currentUser.id) {
+            return;
+        }
 
         const allUsers = storage.getUsers();
-        const userToUpdate = allUsers.find(u => u.id === userId);
-
-        if (!userToUpdate) return;
-
-        const finalData = {
-            ...userToUpdate,
-            ...updatedData,
-            role: userToUpdate.role,
-            designation: userToUpdate.designation,
-            updatedAt: new Date().toISOString(),
-            updatedBy: currentUser.name,
-            updatedByUserId: currentUser.id
-        };
+        const userToUpdate = allUsers.find(user => user.id === userId);
+        if (!userToUpdate) {
+            return;
+        }
 
         try {
-            const updatedUsers = allUsers.map(user =>
-                user.id === userId ? finalData : user
-            );
+            const finalData = {
+                ...userToUpdate,
+                ...updatedData,
+                role: userToUpdate.role
+            };
+
+            const updatedUsers = allUsers.map(user => {
+                if (user.id === userId) {
+                    return finalData;
+                } else {
+                    return user;
+                }
+            });
 
             storage.setUsers(updatedUsers);
             storage.setCurrentUser(finalData);
+            updateCurrentUser(finalData);
+
             loadData();
             setOpenProfileDialog(false);
+
         } catch (error) {
             console.error('Error updating user:', error);
         }
@@ -99,7 +148,7 @@ const EmployeeDashboard = () => {
                     <Grid container spacing={3} alignItems="center">
                         <Grid item>
                             <Avatar sx={{ width: 64, height: 64, bgcolor: 'primary.main' }}>
-                                {currentUser.name.charAt(0)}
+                                {currentUser.name.charAt(0).toUpperCase()}
                             </Avatar>
                         </Grid>
                         <Grid item xs>
@@ -112,10 +161,12 @@ const EmployeeDashboard = () => {
                         <Grid item>
                             <Button
                                 variant="outlined"
-                                startIcon={<EditIcon />}
-                                onClick={() => handleViewProfile(currentUser)}
+                                onClick={() => {
+                                    setSelectedUser(currentUser);
+                                    setOpenProfileDialog(true);
+                                }}
                             >
-                                Edit Profile
+                                View Profile
                             </Button>
                         </Grid>
                     </Grid>
@@ -135,7 +186,6 @@ const EmployeeDashboard = () => {
                     <Typography variant="h6" sx={{ mb: 2 }}>Administrators</Typography>
                     <UserList
                         users={users.admins}
-                        onViewProfile={handleViewProfile}
                         showActions={false}
                     />
                 </Paper>
@@ -146,7 +196,6 @@ const EmployeeDashboard = () => {
                     <Typography variant="h6" sx={{ mb: 2 }}>Employees</Typography>
                     <UserList
                         users={users.employees}
-                        onViewProfile={handleViewProfile}
                         showActions={false}
                     />
                 </Paper>
@@ -170,18 +219,14 @@ const EmployeeDashboard = () => {
                 fullWidth
                 aria-labelledby="profile-dialog-title"
             >
-                <DialogTitle id="profile-dialog-title">
-                    {selectedUser?.id === currentUser.id ? 'Edit Profile' : 'View Profile'}
-                </DialogTitle>
+                <DialogTitle id="profile-dialog-title">Edit Profile</DialogTitle>
                 <DialogContent>
                     {selectedUser && (
                         <UserProfileView
                             user={selectedUser}
-                            teams={teams.filter(team =>
-                                team.members.some(member => member.userId === selectedUser.id)
-                            )}
+                            teams={teams}
                             onUpdate={handleUpdateUser}
-                            canEdit={selectedUser.id === currentUser.id}
+                            canEdit={true}
                             isAdminView={false}
                             onClose={() => setOpenProfileDialog(false)}
                             showTeams={true}

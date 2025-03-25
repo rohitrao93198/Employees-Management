@@ -16,9 +16,8 @@ import {
     ListItem,
     ListItemText
 } from '@mui/material';
-import { formatDate, formatDisplayDate } from '../../utils/dateUtils';
-
-const CURRENT_TIME = '2025-03-11 07:08:16';
+import EditIcon from '@mui/icons-material/Edit';
+import { formatDate } from '../../utils/dateUtils';
 
 const UserProfileView = ({ user, teams, onClose, onUpdate, isAdminView, isSuperAdminView = false, canEdit = false, showTeams = false }) => {
     const [isEditing, setIsEditing] = useState(false);
@@ -38,60 +37,47 @@ const UserProfileView = ({ user, teams, onClose, onUpdate, isAdminView, isSuperA
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        // Only include password in update if it was changed
         const updateData = {
-            ...formData,
-            ...(formData.password ? { password: formData.password } : {})
+            name: formData.name,
+            email: formData.email,
+            designation: formData.designation
         };
-        delete updateData.password; // Remove empty password from object
+
+        // Add password only if provided
+        const password = formData.password.trim();
+        if (password) {
+            updateData.password = password;
+        }
+
         onUpdate(user.id, updateData);
         setIsEditing(false);
     };
 
-    const getDesignationColor = (designation) => {
-        switch (designation) {
-            case 'frontend':
-                return 'info';
-            case 'backend':
-                return 'success';
-            case 'fullstack':
-                return 'primary';
-            case 'tester':
-                return 'warning';
-            default:
-                return 'default';
-        }
-    };
 
     const getDesignationLabel = (designation) => {
-        switch (designation) {
-            case 'frontend':
-                return 'Frontend Developer';
-            case 'backend':
-                return 'Backend Developer';
-            case 'fullstack':
-                return 'Full Stack Developer';
-            case 'tester':
-                return 'Tester';
-            default:
-                return designation;
+        if (designation === 'frontend') {
+            return 'Frontend Developer';
+        } else if (designation === 'backend') {
+            return 'Backend Developer';
+        } else if (designation === 'fullstack') {
+            return 'Full Stack Developer';
+        } else if (designation === 'tester') {
+            return 'Tester';
+        } else {
+            return designation || 'Not Assigned';
         }
     };
 
     const getDesignationDisplay = () => {
-        // First check for SUPER_ADMIN role
         if (user.role === 'SUPER_ADMIN') {
             return 'Super Admin';
         }
-        // Then check for ADMIN role
         if (user.role === 'ADMIN') {
             return 'Admin';
         }
-        // For employees, check designation
         if (user.designation) {
             return getDesignationLabel(user.designation);
         }
-        // Only return Not Assigned if no role or designation is found
         return 'Not Assigned';
     };
 
@@ -142,7 +128,7 @@ const UserProfileView = ({ user, teams, onClose, onUpdate, isAdminView, isSuperA
                                             </FormControl>
                                         </Grid>
                                     )}
-                                    {isSuperAdminView && (
+                                    {(isSuperAdminView || isAdminView) && (
                                         <Grid item xs={12}>
                                             <TextField
                                                 fullWidth
@@ -171,6 +157,7 @@ const UserProfileView = ({ user, teams, onClose, onUpdate, isAdminView, isSuperA
                                     {canEdit && (
                                         <Button
                                             variant="outlined"
+                                            startIcon={<EditIcon />}
                                             onClick={() => setIsEditing(true)}
                                         >
                                             Edit Profile
@@ -192,13 +179,8 @@ const UserProfileView = ({ user, teams, onClose, onUpdate, isAdminView, isSuperA
                             </Grid>
                             <Grid item xs={12}>
                                 <Typography variant="body2" color="textSecondary">
-                                    Created: {formatDate(user.createdAt)}
+                                    Created At : {formatDate(user.createdAt)}
                                 </Typography>
-                                {user.updatedAt && (
-                                    <Typography variant="body2" color="textSecondary">
-                                        Last Updated: {formatDate(user.updatedAt)}
-                                    </Typography>
-                                )}
                             </Grid>
                         </>
                     )}

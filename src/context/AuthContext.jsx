@@ -15,22 +15,21 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
+
     const login = (email, password) => {
         const users = storage.getUsers();
-        console.log('Attempting login for:', email);
-        console.log('Available users:', users);
-
-        const foundUser = users.find(u =>
-            u.email.toLowerCase() === email.toLowerCase() && u.password === password
-        );
+        const foundUser = users.find(user => {
+            const emailMatch = user.email.toLowerCase() === email.toLowerCase();
+            const passwordMatch = user.password === password;
+            return emailMatch && passwordMatch;
+        });
 
         if (foundUser) {
-            const userWithoutPassword = { ...foundUser };
-            delete userWithoutPassword.password;
-            storage.setCurrentUser(userWithoutPassword);
-            setUser(userWithoutPassword);
+            storage.setCurrentUser(foundUser);
+            setUser(foundUser);
             return true;
         }
+
         return false;
     };
 

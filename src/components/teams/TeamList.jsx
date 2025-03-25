@@ -24,10 +24,8 @@ import {
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import DeleteIcon from '@mui/icons-material/Delete';
-import { formatDate, formatDisplayDate } from '../../utils/dateUtils';
+import { formatDate } from '../../utils/dateUtils';
 
-const CURRENT_TIME = '2025-03-11 08:00:47';
-const CURRENT_USER = 'rohitrao93198';
 
 const TeamList = ({
     teams,
@@ -43,69 +41,120 @@ const TeamList = ({
     const [selectedMembers, setSelectedMembers] = useState([]);
 
     const handleExpandClick = (teamId) => {
-        setExpandedTeam(expandedTeam === teamId ? null : teamId);
+        if (expandedTeam === teamId) {
+            setExpandedTeam(null);
+        } else {
+            setExpandedTeam(teamId)
+        }
     };
 
     const handleEditMembers = (team) => {
         setSelectedTeam(team);
-        setSelectedMembers(team.members.map(member => ({
-            ...member,
-            ...users.find(user => user.id === member.userId)
-        })));
+
+        const membersWithDetails = team.members.map(member => {
+            const userDetails = users.find(user => user.id === member.userId);
+            return {
+                ...member,
+                name: userDetails?.name,
+                email: userDetails?.email,
+                designation: userDetails?.designation,
+                role: userDetails?.role
+            };
+        });
+
+        setSelectedMembers(membersWithDetails);
+
         setOpenDialog(true);
     };
 
     const handleSaveMembers = () => {
-        if (selectedTeam) {
-            onUpdate(teams.map(team =>
-                team.id === selectedTeam.id
-                    ? { ...team, members: selectedMembers }
-                    : team
-            ));
-            setOpenDialog(false);
-        }
+        if (!selectedTeam) return;
+
+        const updatedTeams = teams.map(team => {
+            if (team.id === selectedTeam.id) {
+                return {
+                    ...team,
+                    members: selectedMembers
+                };
+            }
+            return team;
+        });
+
+        onUpdate(updatedTeams);
+        setOpenDialog(false);
     };
 
     const toggleMember = (user) => {
         const isSelected = selectedMembers.some(member => member.userId === user.id);
-        setSelectedMembers(isSelected
-            ? selectedMembers.filter(member => member.userId !== user.id)
-            : [...selectedMembers, {
+
+        if (isSelected) {
+            const updatedMembers = selectedMembers.filter(member => member.userId !== user.id);
+            setSelectedMembers(updatedMembers);
+        } else {
+            const newMember = {
                 userId: user.id,
                 name: user.name,
                 email: user.email,
                 designation: user.designation || '',
                 role: user.role || 'EMPLOYEE'
-            }]
-        );
+            };
+            setSelectedMembers([...selectedMembers, newMember]);
+        }
     };
+
 
     const getDesignationLabel = (designation) => {
-        const labels = {
-            frontend: 'Frontend Developer',
-            backend: 'Backend Developer',
-            fullstack: 'Full Stack Developer',
-            tester: 'Tester'
-        };
-        return labels[designation] || designation || 'Not Assigned';
+        if (!designation) {
+            return 'Not Assigned';
+        }
+
+        switch (designation) {
+            case 'frontend':
+                return 'Frontend Developer';
+            case 'backend':
+                return 'Backend Developer';
+            case 'fullstack':
+                return 'Full Stack Developer';
+            case 'tester':
+                return 'Tester';
+            default:
+                return designation;
+        }
     };
 
+
     const getDesignationColor = (designation) => {
-        const colors = {
-            frontend: 'info',
-            backend: 'success',
-            fullstack: 'primary',
-            tester: 'warning'
-        };
-        return colors[designation] || 'default';
+        if (!designation) {
+            return 'default';
+        }
+
+        switch (designation) {
+            case 'frontend':
+                return 'info';
+            case 'backend':
+                return 'success';
+            case 'fullstack':
+                return 'primary';
+            case 'tester':
+                return 'warning';
+            default:
+                return 'default';
+        }
     };
 
     const getRoleColor = (role) => {
-        const colors = {
-            ADMIN: 'secondary',
-            SUPER_ADMIN: 'error'
-        };
-        return colors[role] || 'default';
+        if (!role) {
+            return 'default';
+        }
+
+        switch (role) {
+            case 'ADMIN':
+                return 'secondary';
+            case 'SUPER_ADMIN':
+                return 'error';
+            default:
+                return 'default';
+        }
     };
 
     return (

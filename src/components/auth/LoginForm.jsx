@@ -20,7 +20,6 @@ const LoginForm = () => {
 
     const handleSubmit = (e) => {
         e.preventDefault();
-        setError('');
         const success = login(email, password);
         if (!success) {
             setError('Invalid email or password');
@@ -42,7 +41,7 @@ const LoginForm = () => {
                     borderRadius: '50%',
                     color: 'white'
                 }} />
-                <Typography component="h1" variant="h5">
+                <Typography component="h1" variant="h4">
                     Sign in
                 </Typography>
                 <Card sx={{ width: '100%', mt: 2 }}>

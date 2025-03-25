@@ -14,10 +14,16 @@ import {
 const TeamMembersList = ({ team, users, onUpdate }) => {
     const handleToggleMember = (userId) => {
         const currentMembers = team.members || [];
-        const updatedMembers = currentMembers.includes(userId)
-            ? currentMembers.filter(id => id !== userId)
-            : [...currentMembers, userId];
-        onUpdate(updatedMembers);
+
+        const isCurrentMember = currentMembers.includes(userId);
+
+        if (isCurrentMember) {
+            const updatedMembers = currentMembers.filter(id => id !== userId);
+            onUpdate(updatedMembers);
+        } else {
+            const updatedMembers = [...currentMembers, userId];
+            onUpdate(updatedMembers);
+        }
     };
 
     return (

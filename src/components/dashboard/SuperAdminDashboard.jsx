@@ -30,7 +30,7 @@ import TeamForm from '../teams/TeamForm';
 import UserProfileView from '../users/UserProfileView';
 import { useAuth } from '../../context/AuthContext';
 
-const CURRENT_TIME = new Date().toISOString();
+const CURRENT_TIME = new Date().toISOString().split('T')[0];
 const CREATOR_NAME = 'Super Admin';
 
 const SuperAdminDashboard = () => {
@@ -53,16 +53,59 @@ const SuperAdminDashboard = () => {
         loadData();
     }, []);
 
+    const getDesignation = (user) => {
+        if (user.role === 'SUPER_ADMIN') {
+            return 'Super Admin';
+        } else if (user.role === 'ADMIN') {
+            return 'Admin';
+        } else if (user.designation) {
+            return user.designation;
+        } else {
+            return 'Employee';
+        }
+    };
+
     const loadData = () => {
         const allUsers = storage.getUsers();
-        setUsers({
-            admins: allUsers.filter(user =>
-                (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') &&
-                user.id !== currentUser.id
-            ),
-            employees: allUsers.filter(user => user.role === 'EMPLOYEE')
+        const allTeams = storage.getTeams();
+
+        const admins = [];
+        const employees = [];
+
+        allUsers.forEach(user => {
+            const updatedUser = {
+                ...user,
+                designation: getDesignation(user)
+            };
+
+            if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                admins.push(updatedUser);
+            } else {
+                employees.push(updatedUser);
+            }
         });
-        setTeams(storage.getTeams());
+
+        setUsers({ admins, employees });
+
+        const updatedTeams = allTeams.map(team => {
+            return {
+                ...team,
+                members: team.members.map(member => {
+                    const user = allUsers.find(u => u.id === member.userId);
+                    const updatedMember = { ...member };
+
+                    if (user) {
+                        updatedMember.designation = getDesignation(user);
+                    } else {
+                        updatedMember.designation = 'Not Assigned';
+                    }
+
+                    return updatedMember;
+                })
+            };
+        });
+
+        setTeams(updatedTeams);
     };
 
     const handleProfileUpdate = (e) => {
@@ -72,12 +115,6 @@ const SuperAdminDashboard = () => {
         const newPassword = formData.get('newPassword');
         const name = formData.get('name');
         const email = formData.get('email');
-
-        // Remove password validation temporarily for testing
-        // if (currentPassword !== currentUser.password) {
-        //     setProfileError('Current password is incorrect');
-        //     return;
-        // }
 
         // Validate new password only if provided
         if (newPassword && newPassword.length < 6) {
@@ -97,15 +134,19 @@ const SuperAdminDashboard = () => {
 
         try {
             const allUsers = storage.getUsers();
-            // Update user in storage
-            storage.setUsers(allUsers.map(user =>
-                user.id === currentUser.id ? updatedUser : user
-            ));
-            // Update current user in context
+            const updatedUsers = allUsers.map(user => {
+                if (user.id === currentUser.id) {
+                    return updatedUser;
+                } else {
+                    return user;
+                }
+            });
+
+            storage.setUsers(updatedUsers);
             updateCurrentUser(updatedUser);
             setOpenProfileDialog(false);
             setProfileError('');
-            loadData(); // Refresh the data
+            loadData();
         } catch (error) {
             console.error('Error updating profile:', error);
             setProfileError('Failed to update profile');
@@ -117,16 +158,21 @@ const SuperAdminDashboard = () => {
             ...userData,
             id: Date.now(),
             role: userFormRole,
-            designation: userFormRole === 'ADMIN' ? 'Admin' : userData.designation,
             createdAt: CURRENT_TIME,
             createdBy: currentUser.name,
-            createdByUserId: currentUser.id,
-            updatedAt: CURRENT_TIME,
-            updatedBy: CREATOR_NAME,
-            updatedByUserId: currentUser.id
+            createdByUserId: currentUser.id
         };
 
-        storage.setUsers([...storage.getUsers(), newUser]);
+        if (userFormRole === 'ADMIN') {
+            newUser.designation = 'Admin';
+        } else {
+            newUser.designation = userData.designation;
+        }
+
+        const allUsers = storage.getUsers();
+        allUsers.push(newUser);
+        storage.setUsers(allUsers);
+
         loadData();
         setOpenUserDialog(false);
     };
@@ -140,7 +186,11 @@ const SuperAdminDashboard = () => {
             createdBy: currentUser.name,
             createdByUserId: currentUser.id
         };
-        storage.setTeams([...teams, newTeam]);
+
+        const allTeams = storage.getTeams();
+        allTeams.push(newTeam);
+        storage.setTeams(allTeams);
+
         loadData();
         setOpenTeamDialog(false);
     };
@@ -163,14 +213,20 @@ const SuperAdminDashboard = () => {
 
     const handleDeleteConfirm = () => {
         if (deleteType === 'user') {
-            storage.setTeams(teams.map(team => ({
+            const updatedTeams = teams.map(team => ({
                 ...team,
                 members: team.members.filter(member => member.userId !== itemToDelete.id)
-            })));
-            storage.setUsers(storage.getUsers().filter(user => user.id !== itemToDelete.id));
-        } else {
-            storage.setTeams(teams.filter(t => t.id !== itemToDelete.id));
+            }));
+            storage.setTeams(updatedTeams);
+
+            const updatedUsers = storage.getUsers().filter(user => user.id !== itemToDelete.id);
+            storage.setUsers(updatedUsers);
         }
+        else {
+            const updatedTeams = teams.filter(team => team.id !== itemToDelete.id);
+            storage.setTeams(updatedTeams);
+        }
+
         setConfirmDeleteDialog(false);
         setItemToDelete(null);
         loadData();
@@ -182,36 +238,49 @@ const SuperAdminDashboard = () => {
     };
 
     const handleUserUpdate = (userId, updatedData) => {
-        if (!updatedData) return;
+        if (!updatedData) {
+            return;
+        }
+
 
         const allUsers = storage.getUsers();
-        const userToUpdate = allUsers.find(u => u.id === userId);
+        const userToUpdate = allUsers.find(user => user.id === userId);
 
-        if (!userToUpdate || userToUpdate.role === 'SUPER_ADMIN') return;
+        if (!userToUpdate) {
+            return;
+        }
 
-        // Create updated user data
-        const finalData = {
-            ...userToUpdate,
-            name: updatedData.name || userToUpdate.name,
-            email: updatedData.email || userToUpdate.email,
-            password: updatedData.password || userToUpdate.password, // Make sure password is updated
-            role: userToUpdate.role, // Preserve original role
-            designation: userToUpdate.role === 'ADMIN' ? 'Admin' : updatedData.designation,
-            updatedAt: new Date().toISOString(),
-            updatedBy: currentUser.name,
-            updatedByUserId: currentUser.id
-        };
+        if (userToUpdate.role === 'SUPER_ADMIN') {
+            return;
+        }
 
         try {
-            // Update in localStorage
-            const updatedUsers = allUsers.map(user =>
-                user.id === userId ? finalData : user
-            );
+            const finalData = {
+                ...userToUpdate,
+                name: updatedData.name || userToUpdate.name,
+                email: updatedData.email || userToUpdate.email,
+                password: updatedData.password || userToUpdate.password,
+                role: userToUpdate.role
+            };
+
+            if (userToUpdate.role === 'ADMIN') {
+                finalData.designation = 'Admin';
+            } else {
+                finalData.designation = updatedData.designation;
+            }
+
+            const updatedUsers = allUsers.map(user => {
+                if (user.id === userId) {
+                    return finalData;
+                } else {
+                    return user;
+                }
+            });
             storage.setUsers(updatedUsers);
 
-            // Refresh data
             loadData();
             setOpenProfileViewDialog(false);
+
         } catch (error) {
             console.error('Error updating user:', error);
         }

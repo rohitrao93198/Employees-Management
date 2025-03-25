@@ -27,7 +27,7 @@ import TeamForm from '../teams/TeamForm';
 import UserProfileView from '../users/UserProfileView';
 import { useAuth } from '../../context/AuthContext';
 
-const CURRENT_TIME = new Date().toISOString();
+const CURRENT_TIME = new Date().toISOString().split('T')[0];
 const CREATOR_NAME = storage.getCurrentUser()?.name || 'Admin';
 
 const AdminDashboard = () => {
@@ -49,15 +49,57 @@ const AdminDashboard = () => {
         loadData();
     }, []);
 
+    const getDesignation = (user) => {
+        if (user.role === 'SUPER_ADMIN') {
+            return 'Super Admin';
+        } else if (user.role === 'ADMIN') {
+            return 'Admin';
+        } else if (user.designation) {
+            return user.designation;
+        } else {
+            return 'Employee';
+        }
+    };
+
     const loadData = () => {
         const allUsers = storage.getUsers();
-        setUsers({
-            admins: allUsers.filter(user =>
-                user.role === 'ADMIN' || user.role === 'SUPER_ADMIN'
-            ),
-            employees: allUsers.filter(user => user.role === 'EMPLOYEE')
+        const allTeams = storage.getTeams();
+
+        const admins = [];
+        const employees = [];
+
+        allUsers.forEach(user => {
+            const updatedUser = {
+                ...user,
+                designation: getDesignation(user)
+            };
+
+            if (user.role === 'ADMIN' || user.role === 'SUPER_ADMIN') {
+                admins.push(updatedUser);
+            } else {
+                employees.push(updatedUser);
+            }
         });
-        setTeams(storage.getTeams());
+
+        setUsers({ admins, employees });
+
+        const updatedTeams = allTeams.map(team => {
+            const updatedMembers = team.members.map(member => {
+                const user = allUsers.find(u => u.id === member.userId);
+
+                return {
+                    ...member,
+                    designation: user ? getDesignation(user) : 'Not Assigned'
+                };
+            });
+
+            return {
+                ...team,
+                members: updatedMembers
+            };
+        });
+
+        setTeams(updatedTeams);
     };
 
     const handleUserSubmit = (userData) => {
@@ -68,11 +110,16 @@ const AdminDashboard = () => {
             createdAt: CURRENT_TIME,
             createdBy: CREATOR_NAME,
             createdByUserId: currentUser.id,
-            updatedAt: CURRENT_TIME,
-            updatedBy: CREATOR_NAME,
-            updatedByUserId: currentUser.id
         };
-        storage.setUsers([...storage.getUsers(), newUser]);
+
+        const existingUsers = storage.getUsers();
+
+        if (existingUsers) {
+            storage.setUsers([...existingUsers, newUser]);
+        } else {
+            storage.setUsers([newUser]);
+        }
+
         loadData();
         setOpenUserDialog(false);
     };
@@ -109,9 +156,6 @@ const AdminDashboard = () => {
         const finalData = {
             ...userToUpdate,
             ...updatedData,
-            updatedAt: CURRENT_TIME,
-            updatedBy: CREATOR_NAME,
-            updatedByUserId: currentUser.id
         };
 
         storage.setUsers(allUsers.map(user =>
@@ -167,9 +211,6 @@ const AdminDashboard = () => {
             name: formData.get('name'),
             email: formData.get('email'),
             ...(newPassword && { password: newPassword }),
-            updatedAt: new Date().toISOString(),
-            updatedBy: currentUser.name,
-            updatedByUserId: currentUser.id
         };
 
         try {
